@@ -10,6 +10,7 @@ function main {
 			--ca) local CA="$1"; shift ;;
 			--quota) local QUOTA="$1"; shift ;;
 			--data-size) local DATA_SIZE="$1"; shift ;;
+			--key) local KEY_FILE="$1"; shift ;;
 			--days) local DAYS="$1"; shift ;;
 			--dir) local KEY_DIR="$1"; shift ;;
 			--users-file) local USERS_FILE="$1"; shift ;;
@@ -20,14 +21,17 @@ function main {
 				>&2 echo "Unknown option [${arg}]"
 			fi
 			>&2 echo "Options for $(basename "$0") are:"
-			>&2 echo "--username USERNAME user for which a temporary access is to be granted"
+			>&2 echo "--username USERNAME user for which a temporary access is to be granted. \
+--username is also used to find the public key"
 			>&2 echo "--ca CERTIFICATE_AUTHORITY CA to use. It will be generated if not found"
 			>&2 echo "--quota QUOTA user quota. Used with --data-size to compute the duration \
 of the granted access"
 			>&2 echo "--data-size SIZE total size of the data to be transfered. Used with \
 --data-size to compute the duration of the granted access"
+			>&2 echo "[--key FILE] force the public key file to sign. A copy leading with the \
+username will be created. This can be a private file but it is not recommended (optional)"
 			>&2 echo "[--days DAYS] forces the number of days of granted access (optional)"
-			>&2 echo "[--dir KEY_DIR] directory to use to generate the SSH key file. If not \
+			>&2 echo "[--dir DIR] directory to use to generate the SSH key file. If not \
 specified, the default location will be used (optional)"
 			>&2 echo "[--users-files FILE] file to append the user if it is not already \
 included (optional)"
@@ -38,14 +42,17 @@ included (optional)"
 
 	if [[ -z ${USERNAME} ]] || [[ -z ${DAYS} && -z ${QUOTA} && -z ${DATA_SIZE} ]] || [[ -z ${CA} ]]
 	then
-		>&2 echo "--username USERNAME user for which a temporary access is to be granted"
+		>&2 echo "--username USERNAME user for which a temporary access is to be granted. \
+--username is also used to find the public key"
 		>&2 echo "--ca CERTIFICATE_AUTHORITY CA to use. It will be generated if not found"
 		>&2 echo "--quota QUOTA user quota. Used with --data-size to compute the duration \
 of the granted access"
 		>&2 echo "--data-size SIZE total size of the data to be transfered. Used with \
 --data-size to compute the duration of the granted access"
+		>&2 echo "[--key FILE] force the public key file to sign. A copy leading with the \
+username will be created. This can be a private file but it is not recommended (optional)"
 		>&2 echo "[--days DAYS] forces the number of days of granted access (optional)"
-		>&2 echo "[--dir KEY_DIR] directory to use to generate the SSH key file. If not \
+		>&2 echo "[--dir DIR] directory to use to generate the SSH key file. If not \
 specified, the default location will be used (optional)"
 		>&2 echo "[--users-files FILE] file to append the user if it is not already \
 included (optional)"
@@ -55,14 +62,14 @@ included (optional)"
 
 	if [[ -z ${DAYS} ]]
 	then
-		DAYS=$((${DATA_SIZE} / ${QUOTA}))
-		DAYS=$(((${DAYS} * 2) / 7 + 1))
-		DAYS=$((${DAYS} * 7))
+		local DAYS=$((${DATA_SIZE} / ${QUOTA}))
+		local DAYS=$(((${DAYS} * 2) / 7 + 1))
+		local DAYS=$((${DAYS} * 7))
 	fi
 
 	if [[ ${DAYS} -lt 1 ]]
 	then
-		DAYS=1
+		local DAYS=1
 	fi
 
 	if [[ ! -f ${CA} ]]
@@ -71,13 +78,32 @@ included (optional)"
 		ssh-keygen -b 4096 -f "${CA}" -P ""
 	fi
 
+	if [[ ! -z ${KEY_FILE} ]]
+	then
+		local _KEY_FILE=${KEY_FILE}
+
+		local KEY_DIR=`dirname ${KEY_FILE}`
+		if [[ -z ${KEY_DIR} ]]
+		then
+			local KEY_DIR=.
+		fi
+
+		local KEY_FILE=`basename ${KEY_FILE}`
+		local KEY_FILE="${USERNAME}__${KEY_FILE#${USERNAME}__}"
+
+		[[ -f ${KEY_FILE} ]] || cp -a "${_KEY_FILE}" "${KEY_DIR}/${KEY_FILE}"
+
+		local KEY_FILE="${KEY_FILE%.pub}"
+	else
+		local KEY_FILE="${USERNAME}__id_ed25519"
+	fi
 	if [[ -z ${KEY_DIR} ]]
 	then
 		local KEY_DIR="~/.ssh"
 	fi
+	local KEY_FILE="${KEY_DIR}/${KEY_FILE}"
 
 	mkdir -p "${KEY_DIR}"
-	local KEY_FILE="${KEY_DIR}/${USERNAME}__id_ed25519"
 	if [[ -f ${KEY_FILE} && ! -f ${KEY_FILE}.pub ]]
 	then
 		ssh-keygen -y -f "${KEY_FILE}" > "${KEY_FILE}.pub"
