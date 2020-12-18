@@ -22,11 +22,15 @@ function main {
 			>&2 echo "Options for $(basename "$0") are:"
 			>&2 echo "--username USERNAME user for which a temporary access is to be granted"
 			>&2 echo "--ca CERTIFICATE_AUTHORITY CA to use. It will be generated if not found"
-			>&2 echo "--quota QUOTA user quota. Used with --data-size to compute the duration of the granted access"
-			>&2 echo "--data-size SIZE total size of the data to be transfered. Used with --data-size to compute the duration of the granted access"
+			>&2 echo "--quota QUOTA user quota. Used with --data-size to compute the duration \
+of the granted access"
+			>&2 echo "--data-size SIZE total size of the data to be transfered. Used with \
+--data-size to compute the duration of the granted access"
 			>&2 echo "[--days DAYS] forces the number of days of granted access (optional)"
-			>&2 echo "[--dir KEY_DIR] directory to use to generate the SSH key file. If not specified, the default location will be used (optional)"
-			>&2 echo "[--users-files FILE] file to append the user if it is not already included (optional)"
+			>&2 echo "[--dir KEY_DIR] directory to use to generate the SSH key file. If not \
+specified, the default location will be used (optional)"
+			>&2 echo "[--users-files FILE] file to append the user if it is not already \
+included (optional)"
 			exit 1
 			;;
 		esac
@@ -35,11 +39,16 @@ function main {
 	if [[ -z ${USERNAME} ]] || [[ -z ${DAYS} && -z ${QUOTA} && -z ${DATA_SIZE} ]] || [[ -z ${CA} ]]
 	then
 		>&2 echo "--username USERNAME user for which a temporary access is to be granted"
-		>&2 echo "--quota QUOTA user quota. Used with --data-size to compute the duration of the granted access"
-		>&2 echo "--data-size SIZE total size of the data to be transfered. Used with --data-size to compute the duration of the granted access"
 		>&2 echo "--ca CERTIFICATE_AUTHORITY CA to use. It will be generated if not found"
+		>&2 echo "--quota QUOTA user quota. Used with --data-size to compute the duration \
+of the granted access"
+		>&2 echo "--data-size SIZE total size of the data to be transfered. Used with \
+--data-size to compute the duration of the granted access"
 		>&2 echo "[--days DAYS] forces the number of days of granted access (optional)"
-		>&2 echo "[--dir KEY_DIR] directory to use to generate the SSH key file. If not specified, the default \`~/.ssh\` location will be used (optional)"
+		>&2 echo "[--dir KEY_DIR] directory to use to generate the SSH key file. If not \
+specified, the default location will be used (optional)"
+		>&2 echo "[--users-files FILE] file to append the user if it is not already \
+included (optional)"
 		>&2 echo "Missing --username, --quota, --data-size and/or --ca options"
 		exit 1
 	fi
@@ -73,13 +82,19 @@ function main {
 	then
 		ssh-keygen -y -f "${KEY_FILE}" > "${KEY_FILE}.pub"
 	fi
-	if [[ ! -f ${KEY_FILE} ]]
+	if [[ ! -f ${KEY_FILE} && ! -f ${KEY_FILE}.pub  ]]
 	then
 		ssh-keygen -t ed25519 -f "${KEY_FILE}" -P ""
 	fi
+	if [[ -f ${KEY_FILE} ]]
+	then
+		echo "It is not recommended to have the private key generated here \
+as it then requires to send it to the user. If possible, the user should only send \
+it's public here for it to be signed then sent back."
+	fi
 
 	umask 077
-	ssh-keygen -s "${CA}" -I "${USERNAME}" -n "${USERNAME}" -V +${DAYS}d "${KEY_FILE}"
+	ssh-keygen -s "${CA}" -I "${USERNAME}" -n "${USERNAME}" -V +${DAYS}d "${KEY_FILE}.pub"
 	# Verify the expiry date and other details of the signed key with
 	# `ssh-keygen -L -f ${KEY_FILE}-cert.pub`
 
