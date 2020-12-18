@@ -16,6 +16,10 @@ function log() {
     echo "[$0] $*" >&2
 }
 
+# Give the right ownership and permissions to allow a chroot
+chown root:root "/home"
+chmod 755 "/home"
+
 # Allow running other programs, e.g. bash
 if [[ -z "$1" || "$1" =~ $reArgsMaybe ]]; then
     startSshd=true
