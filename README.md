@@ -2,12 +2,12 @@
 
 ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/atmoz/sftp/build?logo=github) ![GitHub stars](https://img.shields.io/github/stars/atmoz/sftp?logo=github) ![Docker Stars](https://img.shields.io/docker/stars/atmoz/sftp?label=stars&logo=docker) ![Docker Pulls](https://img.shields.io/docker/pulls/atmoz/sftp?label=pulls&logo=docker)
 
-![OpenSSH logo](https://raw.githubusercontent.com/atmoz/sftp/master/openssh.png "Powered by OpenSSH")
+![OpenSSH logo](https://raw.githubusercontent.com/mila-iqia/sftp/master/openssh.png "Powered by OpenSSH")
 
 # Supported tags and respective `Dockerfile` links
 
-- [`debian`, `latest` (*Dockerfile*)](https://github.com/atmoz/sftp/blob/master/Dockerfile) ![Docker Image Size (debian)](https://img.shields.io/docker/image-size/atmoz/sftp/debian?label=debian&logo=debian&style=plastic)
-- [`alpine` (*Dockerfile*)](https://github.com/atmoz/sftp/blob/master/Dockerfile-alpine) ![Docker Image Size (alpine)](https://img.shields.io/docker/image-size/atmoz/sftp/alpine?label=alpine&logo=Alpine%20Linux&style=plastic)
+- [`debian`, `latest` (*Dockerfile*)](https://github.com/mila-iqia/sftp/blob/master/Dockerfile) ![Docker Image Size (debian)](https://img.shields.io/docker/image-size/mila-iqia/sftp/debian?label=debian&logo=debian&style=plastic)
+- [`alpine` (*Dockerfile*)](https://github.com/mila-iqia/sftp/blob/master/Dockerfile-alpine) ![Docker Image Size (alpine)](https://img.shields.io/docker/image-size/mila-iqia/sftp/alpine?label=alpine&logo=Alpine%20Linux&style=plastic)
 
 # Securely share your files
 
@@ -23,12 +23,12 @@ Easy to use SFTP ([SSH File Transfer Protocol](https://en.wikipedia.org/wiki/SSH
   - Directory names at the end will be created under user's home directory with
     write permission, if they aren't already present.
 - Mount volumes
-  - The users are chrooted to their home directory, so you can mount the
-    volumes in separate directories inside the user's home directory
+  - The users are chrooted into `~/.jail/`, so you can mount the volumes in
+    separate directories inside the user's home directory
     (/home/user/**mounted-directory**) or just mount the whole **/home** directory.
-    Just remember that the users can't create new files directly under their
-    own home directory, so make sure there are at least one subdirectory if you
-    want them to upload files.
+    This allows to use CA signed public keys for temporary access to the service.
+    The user's `~/.jail/` along with an `uploads/` sub-directory will gets
+    automatically created.
   - For consistent server fingerprint, mount your own host keys (i.e. `/etc/ssh/ssh_host_*`)
 
 # Examples
@@ -36,10 +36,10 @@ Easy to use SFTP ([SSH File Transfer Protocol](https://en.wikipedia.org/wiki/SSH
 ## Simplest docker run example
 
 ```
-docker run -p 22:22 -d atmoz/sftp foo:pass:::upload
+docker run -p 22:22 -d mila-iqia/sftp foo:pass:::extra
 ```
 
-User "foo" with password "pass" can login with sftp and upload files to a folder called "upload". No mounted directories or custom UID/GID. Later you can inspect the files and use `--volumes-from` to mount them somewhere else (or see next example).
+User "foo" with password "pass" can login with sftp and upload files to a folder called "extra" in addition to the existing "uploads". No mounted directories or custom UID/GID. Later you can inspect the files and use `--volumes-from` to mount them somewhere else (or see next example).
 
 ## Sharing a directory from your computer
 
@@ -47,8 +47,8 @@ Let's mount a directory and set UID:
 
 ```
 docker run \
-    -v <host-dir>/upload:/home/foo/upload \
-    -p 2222:22 -d atmoz/sftp \
+    -v <host-dir>/extra:/home/foo/extra \
+    -p 2222:22 -d mila-iqia/sftp \
     foo:pass:1001
 ```
 
@@ -56,9 +56,9 @@ docker run \
 
 ```
 sftp:
-    image: atmoz/sftp
+    image: mila-iqia/sftp
     volumes:
-        - <host-dir>/upload:/home/foo/upload
+        - <host-dir>/extra:/home/foo/extra
     ports:
         - "2222:22"
     command: foo:pass:1001
@@ -74,7 +74,7 @@ The OpenSSH server runs by default on port 22, and in this example, we are forwa
 docker run \
     -v <host-dir>/users.conf:/etc/sftp/users.conf:ro \
     -v mySftpVolume:/home \
-    -p 2222:22 -d atmoz/sftp
+    -p 2222:22 -d mila-iqia/sftp
 ```
 
 <host-dir>/users.conf:
@@ -92,23 +92,33 @@ Add `:e` behind password to mark it as encrypted. Use single quotes if using ter
 ```
 docker run \
     -v <host-dir>/share:/home/foo/share \
-    -p 2222:22 -d atmoz/sftp \
+    -p 2222:22 -d mila-iqia/sftp \
     'foo:$1$0G2g0GSt$ewU0t6GXG15.0hWoOX8X9.:e:1001'
 ```
 
-Tip: you can use [atmoz/makepasswd](https://hub.docker.com/r/atmoz/makepasswd/) to generate encrypted passwords:  
-`echo -n "your-password" | docker run -i --rm atmoz/makepasswd --crypt-md5 --clearfrom=-`
+Tip: you can use [mila-iqia/makepasswd](https://hub.docker.com/r/mila-iqia/makepasswd/) to generate encrypted passwords:
+`echo -n "your-password" | docker run -i --rm mila-iqia/makepasswd --crypt-md5 --clearfrom=-`
 
 ## Logging in with SSH keys
 
-Mount public keys in the user's `.ssh/keys/` directory. All keys are automatically appended to `.ssh/authorized_keys` (you can't mount this file directly, because OpenSSH requires limited file permissions). In this example, we do not provide any password, so the user `foo` can only login with his SSH key.
+Mount public keys in `/etc/ssh/keys/` directory. All keys starting with "${USER}__" are automatically appended to `.ssh/authorized_keys` (you can't mount this file directly, because OpenSSH requires limited file permissions). In this example, we do not provide any password, so the user `foo` can only login with his SSH key.
 
 ```
 docker run \
-    -v <host-dir>/id_rsa.pub:/home/foo/.ssh/keys/id_rsa.pub:ro \
-    -v <host-dir>/id_other.pub:/home/foo/.ssh/keys/id_other.pub:ro \
-    -v <host-dir>/share:/home/foo/share \
-    -p 2222:22 -d atmoz/sftp \
+    -v <host-dir>/id_rsa.pub:/etc/ssh/keys/foo_id_rsa.pub:ro \
+    -v <host-dir>/id_other.pub:/etc/ssh/keys/foo_id_other.pub:ro \
+    -v <host-dir>/share:/home/foo/.jail/share \
+    -p 2222:22 -d mila-iqia/sftp \
+    foo::1001
+```
+
+If `/etc/ssh/keys/ca.pub` is present, it will also be added to all users' `.ssh/authorized_keys` with the "cert-authority " prefix to be used as a CA to authenticaticate public keys.
+
+```
+docker run \
+    -v <host-dir>/ca.pub:/etc/ssh/keys/ca.pub:ro \
+    -v <host-dir>/share:/home/foo/.jail/share \
+    -p 2222:22 -d mila-iqia/sftp \
     foo::1001
 ```
 
@@ -118,10 +128,10 @@ This container will generate new SSH host keys at first run. To avoid that your 
 
 ```
 docker run \
-    -v <host-dir>/ssh_host_ed25519_key:/etc/ssh/ssh_host_ed25519_key \
-    -v <host-dir>/ssh_host_rsa_key:/etc/ssh/ssh_host_rsa_key \
+    -v <host-dir>/ssh_host_ed25519_key:/etc/ssh/ssh_host_ed25519_key:ro \
+    -v <host-dir>/ssh_host_rsa_key:/etc/ssh/ssh_host_rsa_key:ro \
     -v <host-dir>/share:/home/foo/share \
-    -p 2222:22 -d atmoz/sftp \
+    -p 2222:22 -d mila-iqia/sftp \
     foo::1001
 ```
 
