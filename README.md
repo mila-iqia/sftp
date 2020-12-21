@@ -112,11 +112,11 @@ docker run \
     foo::1001
 ```
 
-If `/etc/ssh/keys/ca.pub` is present, it will also be added to all users' `.ssh/authorized_keys` with the "cert-authority " prefix to be used as a CA to authenticaticate public keys.
+If `/etc/ssh/ca.pub` is present, it will also be added to all users' `.ssh/authorized_keys` with the "cert-authority " prefix to be used as a CA to authenticaticate public keys.
 
 ```
 docker run \
-    -v <host-dir>/ca.pub:/etc/ssh/keys/ca.pub:ro \
+    -v <host-dir>/ca.pub:/etc/ssh/ca.pub:ro \
     -v <host-dir>/share:/home/foo/.jail/share \
     -p 2222:22 -d mila-iqia/sftp \
     foo::1001
