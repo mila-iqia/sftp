@@ -93,9 +93,10 @@ if [ -d "$userKeysQueuedDir" ]; then
     mkdir -p "/home/$user/.ssh"
 
     # Prepend `cert-authority` to tell ssh that this is a CA
-    if [[ -f "$userKeysQueuedDir/ca.pub" ]]
+    if [[ -f "/etc/ssh/ca.pub" ]]
     then
-        echo "cert-authority `cat "$userKeysQueuedDir/ca.pub"`" >> "$userKeysAllowedFileTmp"
+        cert_auth=`cat "/etc/ssh/ca.pub"`
+        echo "cert-authority $cert_auth" >> "$userKeysAllowedFileTmp"
     fi
     for publickey in "$userKeysQueuedDir/${user}__"*.pub; do
         if [[ -f "$publickey" ]]; then

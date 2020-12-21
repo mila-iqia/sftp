@@ -91,7 +91,7 @@ included (optional)"
 		local KEY_FILE=`basename ${KEY_FILE}`
 		local KEY_FILE="${USERNAME}__${KEY_FILE#${USERNAME}__}"
 
-		[[ -f ${KEY_FILE} ]] || cp -a "${_KEY_FILE}" "${KEY_DIR}/${KEY_FILE}"
+		[[ ! -f ${KEY_FILE} ]] || cp -a "${_KEY_FILE}" "${KEY_DIR}/${KEY_FILE}"
 
 		local KEY_FILE="${KEY_FILE%.pub}"
 	else
